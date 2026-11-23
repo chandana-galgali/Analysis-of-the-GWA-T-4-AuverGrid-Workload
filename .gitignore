@@ -1,0 +1,7 @@
+# Extracted trace (regenerated from data/*.zip)
+data/anon_jobs.db3
+
+# Python / Jupyter
+__pycache__/
+.ipynb_checkpoints/
+.venv/

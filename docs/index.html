@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GWA-T-4 AuverGrid Workload Analysis</title>
+<meta name="description" content="Interactive workload characterization of the GWA-T-4 AuverGrid grid trace: 404k jobs from 2006.">
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f3f0;
+    --surface-1: #fcfcfb;
+    --border: #e2e1dc;
+    --grid: #ebeae6;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #77766f;
+    --series-1: #2a78d6;
+    --series-1-hover: #1c5fae;
+    --accent-line: #0b0b0b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface-0: #121211;
+      --surface-1: #1a1a19;
+      --border: #2f2f2d;
+      --grid: #2a2a28;
+      --text-primary: #f0efec;
+      --text-secondary: #c3c2b7;
+      --text-muted: #96958c;
+      --series-1: #3987e5;
+      --series-1-hover: #6aa6ee;
+      --accent-line: #f0efec;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 48px 20px 64px; }
+  header h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); line-height: 1.15; margin: 0 0 12px; letter-spacing: -0.02em; }
+  .eyebrow { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.75rem; color: var(--text-muted); margin: 0 0 8px; font-weight: 600; }
+  .lede { color: var(--text-secondary); font-size: 1.1rem; max-width: 720px; margin: 0 0 20px; }
+  .links { display: flex; gap: 10px; flex-wrap: wrap; }
+  .links a {
+    color: var(--text-primary); text-decoration: none; font-size: 0.9rem; font-weight: 500;
+    border: 1px solid var(--border); background: var(--surface-1); padding: 7px 14px; border-radius: 999px;
+  }
+  .links a:hover { border-color: var(--text-muted); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 36px 0 8px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .tile .v { font-size: 1.75rem; font-weight: 650; letter-spacing: -0.02em; line-height: 1.2; }
+  .tile .k { color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px; }
+  section { margin-top: 56px; }
+  section h2 { font-size: 1.45rem; margin: 0 0 6px; letter-spacing: -0.01em; }
+  section > p { color: var(--text-secondary); margin: 0 0 16px; max-width: 760px; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 18px 18px 10px; position: relative; }
+  .card h3 { margin: 0 0 2px; font-size: 1rem; }
+  .card .sub { color: var(--text-muted); font-size: 0.85rem; margin: 0 0 8px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 14px; }
+  .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px; }
+  .chart { width: 100%; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart text { fill: var(--text-muted); font-size: 11px; font-family: inherit; }
+  .chart .axis-title { fill: var(--text-secondary); font-size: 12px; }
+  .chart .gridline { stroke: var(--grid); stroke-width: 1; }
+  .chart .baseline { stroke: var(--text-muted); stroke-width: 1; }
+  .chart .bar { fill: var(--series-1); }
+  .chart .hit:hover + .bar, .chart .bar.active { fill: var(--series-1-hover); }
+  .chart .hit { fill: transparent; cursor: crosshair; }
+  .chart .marker { stroke: var(--accent-line); stroke-width: 1.5; stroke-dasharray: 4 3; }
+  .chart .marker-label { fill: var(--text-primary); font-size: 11.5px; font-weight: 600; }
+  .chart .line { fill: none; stroke: var(--series-1); stroke-width: 2; }
+  .chart .dot { fill: var(--series-1); stroke: var(--surface-1); stroke-width: 2; }
+  .tip {
+    position: fixed; pointer-events: none; z-index: 10; opacity: 0; transition: opacity .08s;
+    background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border);
+    box-shadow: 0 4px 16px rgba(0,0,0,.12); border-radius: 8px; padding: 8px 10px; font-size: 0.82rem; line-height: 1.45;
+  }
+  .tip b { font-weight: 650; }
+  .tip .m { color: var(--text-secondary); }
+  .note { font-size: 0.85rem; color: var(--text-muted); margin-top: 10px; }
+  footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 0.88rem; }
+  footer a { color: inherit; }
+  @media (max-width: 480px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Grid workload characterization</p>
+    <h1>What 404,176 jobs on a real computing grid look like</h1>
+    <p class="lede" id="lede">An analysis of the GWA-T-4 trace from AuverGrid, a production grid of five clusters (475 CPUs) in the Auvergne region of France, used mainly for biomedical and high-energy-physics research. The trace covers every job submitted during 2006.</p>
+    <div class="links">
+      <a href="https://github.com/chandana-galgali/Analysis-of-the-GWA-T-4-AuverGrid-Workload">View code on GitHub</a>
+      <a href="https://colab.research.google.com/github/chandana-galgali/Analysis-of-the-GWA-T-4-AuverGrid-Workload/blob/main/Analysis_of_the_GWA_T_4_AuverGrid_Workload.ipynb">Open notebook in Colab</a>
+    </div>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section>
+    <h2>1. Run times vary enormously, while waits are usually short</h2>
+    <p id="t-runtime"></p>
+    <div class="grid2">
+      <div class="card"><h3>Job run time</h3><p class="sub">Share of jobs that ran, by duration (log scale)</p><div class="chart" id="c-runtime"></div></div>
+      <div class="card"><h3>Queue wait time</h3><p class="sub">Share of jobs that waited at all, by wait (log scale)</p><div class="chart" id="c-wait"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>2. Users ask for far more memory than they use</h2>
+    <p id="t-memory"></p>
+    <div class="card"><h3>Memory used ÷ memory requested</h3><p class="sub">Share of jobs that specified a memory request</p><div class="chart" id="c-memory"></div></div>
+  </section>
+
+  <section>
+    <h2>3. Time limits are mostly defaults, and jobs rarely come close</h2>
+    <p id="t-time"></p>
+    <div class="card"><h3>Actual run time ÷ requested time limit</h3><p class="sub">Share of jobs, log scale. 1 = the job ran for its full limit.</p><div class="chart" id="c-time"></div></div>
+  </section>
+
+  <section>
+    <h2>4. When the grid is busy</h2>
+    <p id="t-when"></p>
+    <div class="grid3">
+      <div class="card"><h3>By month</h3><p class="sub">Jobs submitted, 2006</p><div class="chart" id="c-month"></div></div>
+      <div class="card"><h3>By hour of day</h3><p class="sub">Paris time</p><div class="chart" id="c-hour"></div></div>
+      <div class="card"><h3>By day of week</h3><p class="sub">Jobs submitted</p><div class="chart" id="c-weekday"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>5. A few users generate most of the load</h2>
+    <p id="t-users"></p>
+    <div class="card"><h3>Cumulative share of jobs from the top N users</h3><p class="sub">Users ranked by number of jobs submitted (log scale)</p><div class="chart" id="c-users"></div></div>
+  </section>
+
+  <footer>
+    <p><b>Data.</b> The AuverGrid traces were kindly provided by the AuverGrid team (special thanks to Dr. Emmanuel Medernach), the owners of the AuverGrid system, and are distributed through the Grid Workloads Archive (A. Iosup et al., <i>The Grid Workloads Archive</i>, Future Generation Computer Systems 24(7), 2008).</p>
+    <p><b>Method.</b> All figures are computed from the trace's <code>Jobs</code> table by <code>scripts/export_site_data.py</code>; the full analysis is in the <a href="https://github.com/chandana-galgali/Analysis-of-the-GWA-T-4-AuverGrid-Workload">notebook on GitHub</a>. Code released under the MIT License.</p>
+  </footer>
+</div>
+<div class="tip" id="tip"></div>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  const D = window.WORKLOAD_DATA, S = D.summary;
+  const NS = 'http://www.w3.org/2000/svg';
+  const tip = document.getElementById('tip');
+  const pct = (x, d = 0) => (x * 100).toFixed(d) + '%';
+  const num = x => x.toLocaleString('en-US');
+
+  function dur(s) {
+    if (s < 60) return (+s.toPrecision(2)) + ' s';
+    if (s < 3600) return (+(s / 60).toPrecision(2)) + ' min';
+    if (s < 86400 * 2) return (+(s / 3600).toPrecision(2)) + ' h';
+    return (+(s / 86400).toPrecision(2)) + ' days';
+  }
+  function ratioFmt(r) {
+    if (r >= 1) return (+r.toPrecision(2)) + '×';
+    return (r * 100 < 0.01 ? (r * 100).toExponential(0) : +(r * 100).toPrecision(2)) + '%';
+  }
+
+  // ---- stat tiles ----
+  const tiles = [
+    [num(S.jobs), 'jobs from ' + S.users + ' users in 2006'],
+    [dur(S.median_run_s), 'median run time of jobs that ran'],
+    [pct(S.share_wait_under_1min), 'of jobs started within a minute'],
+    [pct(S.mem_under_10pct), 'used under 10% of requested memory'],
+    [pct(S.top10_share), 'of all jobs came from just 10 users'],
+  ];
+  document.getElementById('tiles').innerHTML = tiles.map(([v, k]) =>
+    `<div class="tile"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
+
+  // ---- narrative text (numbers come from the data) ----
+  document.getElementById('t-runtime').textContent =
+    `The median job that actually ran finished in ${dur(S.median_run_s)}, but the mean is ${dur(S.mean_run_s)}: ` +
+    `run times span six orders of magnitude. One group of jobs ends within seconds (tests or failed starts), and a second large group runs for several hours to a few days, ` +
+    `with a sharp cut-off near 72 hours, the most common queue limit. Waiting is usually brief: half of all jobs started within ${dur(S.median_wait_s)}, yet the mean wait is ${dur(S.mean_wait_s)} because of a long tail of jobs stuck in busy periods.`;
+  document.getElementById('t-memory').textContent =
+    `Only ${num(S.mem_jobs)} jobs (${pct(S.mem_jobs / S.jobs)}) stated a memory requirement. Among them the picture splits in two: ` +
+    `${pct(S.mem_under_10pct)} used less than a tenth of what they asked for, while most of the rest used 70–80%. ` +
+    `The mean (${S.mem_mean.toFixed(2)}) lands in the empty gap between the two groups, so the median (${S.mem_median.toFixed(2)}) and the shape tell the real story: a scheduler that reserves memory by request would leave much of it idle.`;
+  document.getElementById('t-time').textContent =
+    `${pct(S.limit_72h_share)} of jobs carried a 72-hour limit and ${pct(S.limit_96h_share)} a 96-hour one, so these look like queue defaults rather than user estimates. ` +
+    `The median job used just ${ratioFmt(S.time_median)} of its limit, and ${pct(S.time_under_10pct)} used less than 10%. Backfilling schedulers rely on these limits to plan, so limits this loose make planning much harder.`;
+  document.getElementById('t-when').textContent =
+    `Load is very uneven over the year: July saw about five times as many submissions as January. Within a day, submissions climb from a low around 5 am to a plateau through working hours and evening. ` +
+    `Weekends are quieter but far from idle, a sign that much of the work is submitted by scripts and pipelines, not only by people at desks.`;
+  document.getElementById('t-users').textContent =
+    `The single most active user submitted ${pct(S.top1_share)} of all jobs, and the top 10 together ${pct(S.top10_share)}. ` +
+    `Just ${S.users_for_80pct} of ${S.users} users (${pct(S.users_for_80pct / S.users)}) account for 80% of the workload. Fair-share scheduling policies exist precisely for distributions like this.`;
+
+  // ---- tooltip ----
+  function showTip(e, html) {
+    tip.innerHTML = html; tip.style.opacity = 1;
+    const r = tip.getBoundingClientRect();
+    let x = e.clientX + 14, y = e.clientY - r.height - 10;
+    if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14;
+    if (y < 8) y = e.clientY + 16;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  }
+  const hideTip = () => { tip.style.opacity = 0; };
+
+  function el(tag, attrs, parent) {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+
+  // Generic bar chart. bars: [{label, value, tip}], opts: {xTicks: [{i, label}], yFmt, height, markers:[{pos (0..n), label}]}
+  function barChart(id, bars, opts) {
+    const host = document.getElementById(id);
+    const W = Math.max(260, host.clientWidth), H = opts.height || 240;
+    const m = { t: 18, r: 10, b: opts.xTitle ? 42 : 26, l: 44 };
+    host.innerHTML = '';
+    const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': opts.aria || '' }, host);
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const max = Math.max(...bars.map(b => b.value)) || 1;
+    const tstep = niceStep(max / 4), ticks = Math.ceil(max / tstep - 1e-9), niceMax = tstep * ticks;
+    for (let i = 0; i <= ticks; i++) {
+      const v = tstep * i, y = m.t + ih - ih * v / niceMax;
+      if (i > 0) el('line', { class: 'gridline', x1: m.l, x2: m.l + iw, y1: y, y2: y }, svg);
+      el('text', { x: m.l - 6, y: y + 3.5, 'text-anchor': 'end' }, svg).textContent = opts.yFmt(v);
+    }
+    const n = bars.length, step = iw / n, gap = n > 30 ? 1 : 2, bw = Math.max(1, step - gap);
+    bars.forEach((b, i) => {
+      const h = ih * b.value / niceMax, x = m.l + i * step + gap / 2, y = m.t + ih - h;
+      const hit = el('rect', { class: 'hit', x: m.l + i * step, y: m.t, width: step, height: ih }, svg);
+      const r = Math.min(3, bw / 2, h);
+      const bar = el('path', { class: 'bar', d: roundTop(x, y, bw, h, r) }, svg);
+      hit.addEventListener('mousemove', e => { bar.classList.add('active'); showTip(e, b.tip); });
+      hit.addEventListener('mouseleave', () => { bar.classList.remove('active'); hideTip(); });
+    });
+    el('line', { class: 'baseline', x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih }, svg);
+    (opts.xTicks || []).forEach(t => {
+      const x = m.l + t.i * step;
+      el('text', { x, y: m.t + ih + 15, 'text-anchor': 'middle' }, svg).textContent = t.label;
+    });
+    if (opts.xTitle) el('text', { class: 'axis-title', x: m.l + iw / 2, y: H - 6, 'text-anchor': 'middle' }, svg).textContent = opts.xTitle;
+    (opts.markers || []).forEach(mk => {
+      const x = m.l + mk.pos * step;
+      el('line', { class: 'marker', x1: x, x2: x, y1: m.t - 4, y2: m.t + ih }, svg);
+      const anchor = mk.pos / n > 0.8 ? 'end' : 'start';
+      el('text', { class: 'marker-label', x: x + (anchor === 'end' ? -5 : 5), y: m.t + 8, 'text-anchor': anchor }, svg).textContent = mk.label;
+    });
+  }
+  function roundTop(x, y, w, h, r) {
+    if (h <= 0) return '';
+    return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+  }
+  function niceStep(v) {
+    const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+  }
+
+  // Log-binned histogram: tick at bin index where edge crosses given value
+  function logPos(edges, v) {
+    const l0 = Math.log10(edges[0]), l1 = Math.log10(edges[edges.length - 1]);
+    return (Math.log10(v) - l0) / (l1 - l0) * (edges.length - 1);
+  }
+  function histBars(h, fmtRange) {
+    const total = h.counts.reduce((a, b) => a + b, 0);
+    return h.counts.map((c, i) => ({
+      value: c / total,
+      tip: `<b>${fmtRange(h.edges[i], h.edges[i + 1])}</b><br>${num(c)} jobs <span class="m">· ${pct(c / total, 1)}</span>`
+    }));
+  }
+  const pctAxis = v => +(v * 100).toFixed(1) + '%';
+
+  function draw() {
+    // run time
+    const durTicks = (edges, list) => list.map(([v, label]) => ({ i: logPos(edges, v), label }));
+    barChart('c-runtime', histBars(D.runtime, (a, b) => `${dur(a)} – ${dur(b)}`), {
+      yFmt: pctAxis, xTitle: 'Run time',
+      xTicks: durTicks(D.runtime.edges, [[1, '1 s'], [60, '1 min'], [3600, '1 h'], [86400, '1 day'], [864000, '10 days']]),
+      markers: [{ pos: logPos(D.runtime.edges, 72 * 3600), label: '72 h' }], aria: 'Histogram of job run times'
+    });
+    barChart('c-wait', histBars(D.wait, (a, b) => `${dur(a)} – ${dur(b)}`), {
+      yFmt: pctAxis, xTitle: 'Wait time',
+      xTicks: durTicks(D.wait.edges, [[1, '1 s'], [60, '1 min'], [3600, '1 h'], [86400, '1 day'], [864000 * 3, '30 days']]),
+      aria: 'Histogram of queue wait times'
+    });
+    // memory
+    const me = D.memory.edges;
+    barChart('c-memory', histBars(D.memory, (a, b) => `${pct(a)} – ${pct(b)} of request used`), {
+      yFmt: pctAxis, xTitle: 'Share of requested memory actually used', height: 260,
+      xTicks: [0, 0.25, 0.5, 0.75, 1].map(v => ({ i: v * (me.length - 1), label: pct(v) })),
+      markers: [{ pos: S.mem_mean * (me.length - 1), label: 'mean ' + S.mem_mean.toFixed(2) },
+                { pos: S.mem_median * (me.length - 1), label: 'median ' + S.mem_median.toFixed(2) }],
+      aria: 'Histogram of memory utilization ratio'
+    });
+    // time ratio
+    const te = D.time_ratio.edges;
+    barChart('c-time', histBars(D.time_ratio, (a, b) => `${ratioFmt(a)} – ${ratioFmt(b)} of limit`), {
+      yFmt: pctAxis, xTitle: 'Run time as a share of the requested limit', height: 260,
+      xTicks: [[1e-6, '0.0001%'], [1e-4, '0.01%'], [1e-2, '1%'], [1, '100%'], [100, '100×']].map(([v, l]) => ({ i: logPos(te, v), label: l })),
+      markers: [{ pos: logPos(te, 1), label: 'limit' }, { pos: logPos(te, S.time_median), label: 'median' }],
+      aria: 'Histogram of run time over requested time limit'
+    });
+    // time patterns
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const kFmt = v => v >= 1000 ? (v / 1000) + 'k' : v;
+    barChart('c-month', D.monthly.map((c, i) => ({ value: c, tip: `<b>${months[i]} 2006</b><br>${num(c)} jobs` })), {
+      yFmt: kFmt, height: 200, xTicks: [0, 3, 6, 9].map(i => ({ i: i + 0.5, label: months[i] })), aria: 'Jobs by month' });
+    barChart('c-hour', D.hourly.map((c, i) => ({ value: c, tip: `<b>${String(i).padStart(2, '0')}:00–${String(i).padStart(2, '0')}:59</b><br>${num(c)} jobs` })), {
+      yFmt: kFmt, height: 200, xTicks: [0, 6, 12, 18].map(i => ({ i: i + 0.5, label: i + ':00' })), aria: 'Jobs by hour of day' });
+    const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    barChart('c-weekday', D.weekday.map((c, i) => ({ value: c, tip: `<b>${days[i]}</b><br>${num(c)} jobs` })), {
+      yFmt: kFmt, height: 200, xTicks: days.map((d, i) => ({ i: i + 0.5, label: d })), aria: 'Jobs by day of week' });
+    lineChart();
+  }
+
+  // User concentration: line chart with log x and crosshair
+  function lineChart() {
+    const host = document.getElementById('c-users');
+    const ys = D.user_cum_share, n = ys.length;
+    const W = Math.max(260, host.clientWidth), H = 260, m = { t: 14, r: 14, b: 42, l: 44 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    host.innerHTML = '';
+    const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Cumulative share of jobs by top N users' }, host);
+    const X = k => m.l + Math.log10(k) / Math.log10(n) * iw, Y = v => m.t + ih - v * ih;
+    [0, .2, .4, .6, .8, 1].forEach(v => {
+      if (v > 0) el('line', { class: 'gridline', x1: m.l, x2: m.l + iw, y1: Y(v), y2: Y(v) }, svg);
+      el('text', { x: m.l - 6, y: Y(v) + 3.5, 'text-anchor': 'end' }, svg).textContent = pct(v);
+    });
+    [1, 10, 100, n].forEach(k => el('text', { x: X(k), y: m.t + ih + 15, 'text-anchor': 'middle' }, svg).textContent = k);
+    el('text', { class: 'axis-title', x: m.l + iw / 2, y: H - 6, 'text-anchor': 'middle' }, svg).textContent = 'Top N users';
+    el('line', { class: 'baseline', x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih }, svg);
+    el('path', { class: 'line', d: ys.map((v, i) => (i ? 'L' : 'M') + X(i + 1).toFixed(1) + ',' + Y(v).toFixed(1)).join('') }, svg);
+    const k80 = S.users_for_80pct;
+    el('line', { class: 'marker', x1: X(k80), x2: X(k80), y1: Y(0), y2: Y(ys[k80 - 1]) }, svg);
+    el('text', { class: 'marker-label', x: X(k80) + 6, y: Y(ys[k80 - 1]) + 16 }, svg).textContent = `${k80} users → 80%`;
+    const cross = el('line', { class: 'gridline', y1: m.t, y2: m.t + ih, x1: 0, x2: 0, style: 'stroke: var(--text-muted)', visibility: 'hidden' }, svg);
+    const dot = el('circle', { class: 'dot', r: 5, cx: 0, cy: 0, visibility: 'hidden' }, svg);
+    const hit = el('rect', { class: 'hit', x: m.l, y: m.t, width: iw, height: ih }, svg);
+    hit.addEventListener('mousemove', e => {
+      const box = svg.getBoundingClientRect(), sx = (e.clientX - box.left) * W / box.width;
+      const k = Math.min(n, Math.max(1, Math.round(Math.pow(10, (sx - m.l) / iw * Math.log10(n)))));
+      cross.setAttribute('visibility', 'visible'); dot.setAttribute('visibility', 'visible');
+      cross.setAttribute('x1', X(k)); cross.setAttribute('x2', X(k));
+      dot.setAttribute('cx', X(k)); dot.setAttribute('cy', Y(ys[k - 1]));
+      showTip(e, `<b>Top ${k} user${k > 1 ? 's' : ''}</b><br>${pct(ys[k - 1], 1)} of all jobs`);
+    });
+    hit.addEventListener('mouseleave', () => { cross.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); hideTip(); });
+  }
+
+  draw();
+  let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(draw, 120); });
+})();
+</script>
+</body>
+</html>
